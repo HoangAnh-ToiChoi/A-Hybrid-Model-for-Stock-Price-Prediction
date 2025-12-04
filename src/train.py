@@ -19,9 +19,9 @@ def main():
     LR = 0.001
 
     x_train, y_train, x_test, y_test = get_mock_data(time_step = TIME_STEP)
-    model = build_cnn_lstm_model(TIME_STEP)
+    
     print("Khoi tao model")
-    model = build_cnn_lstm_model(TIME_STEP, LR)
+    model = build_cnn_lstm_model(time_step = TIME_STEP, features = 1, learning_rate = LR)
     model.summary()
 
     print ("Bat dau train: ")
@@ -29,7 +29,7 @@ def main():
         x_train, y_train,
         validation_data = (x_test, y_test),
         epochs = EPOCH,
-        batch_size = BATCH,
+        batch_size = BATCH_SIZE,
         verbose = 1
     )
 
@@ -39,5 +39,6 @@ def main():
     save_path = os.path.join(save_dir, 'model.keras')
     model.save(save_path)
     print(f"đã lưu model tại: {save_path}")
+
 if __name__ == '__main__':
     main()
