@@ -13,10 +13,10 @@ def main():
     print("Dang nap Model ...")
     model = tf.keras.models.load_model(MODEL_PATH)
 
-    dummy_input = np.random.rand(1, 60, 1)
+    dummy_input = np.random.rand(1, 60, 1) # nhìn 60 ngày trước đoán 1 ngày tương lai, kết quả trả ra là 1 giá trị 
 
     pre_scaled_price = model.predict(dummy_input)
-    val = pre_scaled_price[0][0]
+    val = pre_scaled_price[0][0] # giá dự đoán lấy tk ở đầu dòng và đầu hàng
 
     print("-" * 30)
     print(f"🔮 Giá trị Model trả về (Scaled): {val:.4f}") 
@@ -25,7 +25,7 @@ def main():
     min_price = 100
     max_price = 200
 
-    real_price = val * (max_price - min_price) + min_price
+    real_price = val * (max_price - min_price) + min_price  # quy đổi giá dự đoán thành giá thật 
     print(f"💰 Giá tiền thật quy đổi: ${real_price:.2f}")
     print("-" * 30)
 
