@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from model import build_cnn_lstm_model
+from config import TIME_STEP, EPOCH, BATCH_SIZE, LR
 
 def get_mock_data(time_step = 60):
     print("Test dữ liệu!")
@@ -13,10 +14,7 @@ def get_mock_data(time_step = 60):
 
     return x_train, y_train, x_test, y_test
 def main():
-    TIME_STEP = 60
-    EPOCH = 10 # số lần học là đi học lại là 10 lần 
-    BATCH_SIZE = 32 # 32 bài học cùng lúc 
-    LR = 0.001 # tốc độ học 
+
 
     x_train, y_train, x_test, y_test = get_mock_data(time_step = TIME_STEP) 
     

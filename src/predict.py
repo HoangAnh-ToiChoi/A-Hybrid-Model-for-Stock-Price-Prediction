@@ -2,8 +2,8 @@ import numpy as np
 import tensorflow as tf
 import os
 from sklearn.preprocessing import MinMaxScaler
+from config import MODEL_PATH
 
-MODEL_PATH = 'helloo/model.keras'
 
 def main():
     if not os.path.exists(MODEL_PATH):
