@@ -17,6 +17,6 @@ def build_cnn_lstm_model(time_step = 60, features = 1, learning_rate = 0.001):
    model.add(Dropout(0.2))
 
    optimizer = tf.keras.optimizers.Adam(learning_rate = learning_rate)
-   model.compile(loss = 'mse ', optimizer = optimizer)
+   model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer = optimizer)
 
    return model
