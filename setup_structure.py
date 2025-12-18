@@ -28,15 +28,15 @@ files = [
 # Tạo thư mục
 for folder in folders:
     os.makedirs(folder, exist_ok=True)
-    print(f"✅ Đã tạo thư mục: {folder}")
+    print(f" Đã tạo thư mục: {folder}")
 
 # Tạo file
 for file in files:
     if not os.path.exists(file):
         with open(file, 'w') as f:
             pass # Tạo file rỗng
-        print(f"✅ Đã tạo file: {file}")
+        print(f" Đã tạo file: {file}")
     else:
-        print(f"⚠️ File đã tồn tại: {file}")
+        print(f" File đã tồn tại: {file}")
 
-print("\n🎉 Cấu trúc dự án đã sẵn sàng!")
+print("\n Cấu trúc dự án đã sẵn sàng!")

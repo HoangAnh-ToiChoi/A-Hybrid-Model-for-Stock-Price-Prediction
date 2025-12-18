@@ -1,43 +1,94 @@
-import numpy as np
 import pandas as pd
+import numpy as np
+import os
+import joblib
 from sklearn.preprocessing import MinMaxScaler
 
-def load_data(csv_path, time_step):
-    # 1 doc du lieu tu file csv o folder data/raw
-    df = pd.read_csv(csv_path)
+def create_sequences(data, time_steps=60):
+    """
+    Hàm cắt dữ liệu thành các cửa sổ trượt (Sliding Window).
+    Input: Mảng 2D [Giá, Giá, Giá...]
+    Output: 
+        - X: Mảng 3D (Samples, TimeSteps, 1) -> Dữ liệu quá khứ
+        - y: Mảng 1D (Samples,) -> Giá ngày tiếp theo (Target)
+    """
+    X, y = [], []
+    for i in range(len(data) - time_steps):
+        # Lấy 60 ngày quá khứ làm Input
+        X.append(data[i:(i + time_steps), 0])
+        # Lấy ngày thứ 61 làm nhãn (Target) để dự đoán
+        y.append(data[i + time_steps, 0])
+        
+    return np.array(X), np.array(y)
 
-    # Ép giá trị cột "Close" về dạng số
-    df['Close'] = pd.to_numeric(df['Close'], errors = 'coerce')
-    # Xóa các cột có giá trị rỗng
+def process_and_save(ticker, raw_folder='data/raw', processed_folder='data/processed', time_steps=60):
+    print(f" Đang xử lý mã: {ticker}...")
+    
+    # 1. Kiểm tra file nguồn
+    file_path = os.path.join(raw_folder, f"{ticker}.csv")
+    if not os.path.exists(file_path):
+        print(f"Không tìm thấy file {file_path}")
+        return
+
+    # 2. Đọc dữ liệu
+    df = pd.read_csv(file_path, index_col=0, parse_dates=True)
+    
+    # Chỉ lấy cột Close (Giá đóng cửa)
+    if 'Close' not in df.columns:
+        print(f"File {ticker}.csv không có cột 'Close'")
+        return
+    df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
     df = df.dropna()
-
-    #2 lay cot 'Close' de tien xu ly
-    data = df.filter(['Close']).values
-
-    # 3 chuan hoa du lieu ve khoang (0, 1)
+        
+    data = df[['Close']].values # Chuyển thành numpy array
+    
+    # 3. Chuẩn hóa dữ liệu về khoảng [0, 1]
+    # Mô hình LSTM học tốt nhất khi dữ liệu nhỏ
     scaler = MinMaxScaler(feature_range=(0, 1))
-    scaler_data = scaler.fit_transform(data.reshape(-1, 1))
+    data_scaled = scaler.fit_transform(data)
+    
+    # 4. Tạo Sliding Window (Cắt dữ liệu)
+    X, y = create_sequences(data_scaled, time_steps)
+    
+    # Reshape X từ (Samples, 60) -> (Samples, 60, 1) để khớp với Input của CNN-LSTM
+    X = np.reshape(X, (X.shape[0], X.shape[1], 1))
+    
+    print(f"Kích thước gốc: {data.shape}")
+    print(f"Kích thước sau khi cắt (X): {X.shape}")
+    print(f"Kích thước nhãn (y): {y.shape}")
 
-    # 4 chia du lieu thanh 65 va 35 de train 
-    strain_size = int(np.ceil(len(scaler_data) * 0.65))
-    train_data = scaler_data[0:strain_size, :]
+    # 5. Chia Train/Test (80% Train, 20% Test)
+    # Cắt theo thời gian (không được random shuffle)
+    train_size = int(len(X) * 0.8)
+    
+    X_train, X_test = X[:train_size], X[train_size:]
+    y_train, y_test = y[:train_size], y[train_size:]
+    
+    # 6. Lưu file
+    save_path = os.path.join(processed_folder, ticker)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+        
+    np.save(f"{save_path}/X_train.npy", X_train)
+    np.save(f"{save_path}/y_train.npy", y_train)
+    np.save(f"{save_path}/X_test.npy", X_test)
+    np.save(f"{save_path}/y_test.npy", y_test)
+    
+    joblib.dump(scaler, f"{save_path}/scaler.pkl")
+    
+    print(f"Đã lưu vào: {save_path}")
+    print(f"   Train shape: {X_train.shape}")
+    print(f"   Test shape:  {X_test.shape}")
 
-    # 5 tao dataset de train
-    x_train, y_train = create_dataset(train_data, time_step)
+if __name__ == "__main__":
+    MY_TICKERS = ['AAPL', 'TSLA']
+    TIME_STEPS = 60 
+    
+    
+    # Tạo thư mục processed nếu chưa có
+    if not os.path.exists('data/processed'):
+        os.makedirs('data/processed')
 
-    #6 tao dataset de test
-    test_data = scaler_data[strain_size - time_step:, :]
-    x_test, y_test = create_dataset(test_data, time_step)
-
-    x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], 1)
-    x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
-
-    return x_train, y_train, x_test, y_test, scaler 
-
-def create_dataset(data, time_step):
-    data_x, data_y = [], []
-    for i in range(len(data) - time_step - 1):
-        a = data[i:(i + time_step), 0]
-        data_x.append(a)
-        data_y.append(data[i + time_step, 0])
-    return np.array(data_x), np.array(data_y)
+    for ticker in MY_TICKERS:
+        process_and_save(ticker, time_steps=TIME_STEPS)
+    
