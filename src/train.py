@@ -44,8 +44,8 @@ def train_model(csv_file):
 
     history = model.fit(
         x_train, y_train, # lấy dữ liệu và kết quả ra học 
-        validation_data = (x_test, y_test), # dùng dữ liệu test và kết quả test để kiểm tra sau khi đã học hết 1000 câu hỏi
-        epochs = EPOCH, # lặp lại 32 lần
+        validation_split = 0.2, # dùng dữ liệu test và kết quả test để kiểm tra sau khi đã học hết 1000 câu hỏi
+        epochs = EPOCH, # lặp lại 100 lần
         batch_size = BATCH_SIZE, # 1000 câu hỏi thì mỗi lần học chỉ 32 câu đến khi hết 1000 câu thì quay lại dòng validation_data
         callbacks = checkpoint
     )

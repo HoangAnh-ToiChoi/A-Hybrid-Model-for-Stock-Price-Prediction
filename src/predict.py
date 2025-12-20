@@ -3,8 +3,9 @@ import pandas as pd
 from tensorflow.keras.models import load_model
 from sklearn.preprocessing import MinMaxScaler
 import os
+import matplotlib.pyplot as plt
 
-STOCK_SYMBOL = "TSLA"
+STOCK_SYMBOL = "AAPL"
 MODEL_PATH = f"experiments/{STOCK_SYMBOL}.keras"
 CSV_PATH = f"data/raw/{STOCK_SYMBOL}.csv"
 
@@ -18,7 +19,8 @@ def get_scaler_and_data(csv_path):
     df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
     # 3. Xóa các dòng bị lỗi 
     df = df.dropna(subset=['Close'])
-
+    df['SMA_10'] = df['Close'].rolling(window=10).mean()
+    df['SMA_60'] = df['Close'].rolling(window=60).mean()
     # 4. Lấy dữ liệu sạch
     data = df.filter(['Close']).values
     
@@ -61,23 +63,57 @@ def main():
     print(f"Dự đoán phiên tiếp theo: {pred_price:.2f} USD")
     
     print("\n=============================================")
-    # Logic tư vấn đơn giản
-    diff = pred_price - current_price
-    percent = (diff / current_price) * 100
+    # Lấy giá trị SMA ngày cuối cùng
+    last_sma_10 = df_o.iloc[-1]['SMA_10']
+    last_sma_60 = df_o.iloc[-1]['SMA_60']
 
-    if percent > 1.0:
-        print(f"XU HƯỚNG ĐANG TĂNG MẠNH (+{percent:.2f}%)")
-        print("Khuyến nghị: Cân nhắc MUA VÀO")
-    elif percent > 0:
-        print(f"XU HƯỚNG ĐANG TĂNG NHẸ (+{percent:.2f}%)")
-        print("💡 Khuyến nghị: Nắm giữ / Mua thăm dò")
-    elif percent > -1.0:
-        print(f"XU HƯỚNG ĐANG GIẢM NHẸ ({percent:.2f}%)")
-        print("Khuyến nghị: Thận trọng / Quan sát")
+    print(f"CHỈ SỐ KỸ THUẬT (SMA):")
+    print(f"SMA 10 (Ngắn hạn): {last_sma_10:.2f}")
+    print(f"SMA 60 (Dài hạn):  {last_sma_60:.2f}")
+    print("-" * 40)
+
+    if pd.isna(last_sma_60):
+        print("Chưa đủ dữ liệu 60 ngày để tính SMA.")
+    elif last_sma_10 > last_sma_60:
+        # SMA 10 > SMA 60 => MUA 
+        print("MUA")
     else:
-        print(f"XU HƯỚNG ĐANG GIẢM MẠNH ({percent:.2f}%)")
-        print("Khuyến nghị: Cân nhắc BÁN RA")
+        # SMA 60 > SMA 10 => BÁN 
+        print("BÁN")
     print("=============================================\n")
+
+    # --- VẼ HÌNH ĐỂ BÁO CÁO (Output Chart) ---
+    print("vẽ biểu đồ kết quả...")
+    
+    # Lấy 100 ngày cuối
+    plot_df = df_o.tail(100).copy()
+    
+    plt.figure(figsize=(12, 6))
+    
+    # Vẽ đường giá và SMA
+    plt.plot(plot_df['Close'].values, label='Giá thực tế', color='skyblue', linewidth=2)
+    plt.plot(plot_df['SMA_10'].values, label='SMA 10', color='orange', linestyle='--')
+    plt.plot(plot_df['SMA_60'].values, label='SMA 60', color='purple', linestyle='--')
+    
+    # Vẽ điểm dự đoán (QUAN TRỌNG: Dùng biến pred_price)
+    # Reset index để vẽ tiếp nối vào cuối biểu đồ
+    last_idx = len(plot_df) 
+    plt.scatter(last_idx, pred_price, color='red', s=150, zorder=5, 
+                label=f'AI Dự đoán: {pred_price:.2f}') # <--- Hiện số lên Legend
+    
+    # Vẽ đường nối đứt đoạn từ giá cuối đến giá dự đoán
+    plt.plot([last_idx-1, last_idx], [plot_df['Close'].iloc[-1], pred_price], 
+             color='red', linestyle=':', alpha=0.6)
+
+    plt.title(f'Dự báo {STOCK_SYMBOL} - Theo hướng dẫn Nhóm 11.1')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    # Lưu ảnh
+    save_path = f"experiments/{STOCK_SYMBOL}_prediction.png"
+    plt.savefig(save_path)
+    print(f"Lưu ảnh tại: {save_path}")
+    plt.show()
 
 if __name__ == "__main__":
     main()
