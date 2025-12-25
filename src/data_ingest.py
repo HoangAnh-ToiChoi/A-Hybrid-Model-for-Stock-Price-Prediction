@@ -3,11 +3,9 @@ import pandas as pd
 import os
 
 def download_stock_data(ticker, start_date, end_date, save_folder):
-    """
-    Hàm tải dữ liệu và lưu vào thư mục chỉ định
-    """
-    print(f"\n Đang xử lý mã: {ticker}...")
     
+   # Hàm tải dữ liệu và lưu vào thư mục chỉ định
+    print(f"\n Đang xử lý mã: {ticker}...")
     #Call data từ Yahoo Finance
     try: 
         df = yf.download(ticker, start=start_date, end=end_date)
@@ -40,12 +38,8 @@ if __name__ == "__main__":
     MY_TICKERS = ['AAPL', 'TSLA'] 
     START_DATE = '2015-01-01'
     END_DATE = '2024-01-01'
-    SAVE_DIR = 'data/raw' # Thư mục lưu trữ
-    
-    print(" BẮT ĐẦU TẢI DỮ LIỆU...")
-    
+    SAVE_DIR = 'data/raw' # Thư mục lưu trữ    
     # Vòng lặp: Chạy qua từng mã trong danh sách
     for ticker in MY_TICKERS:
         download_stock_data(ticker, START_DATE, END_DATE, SAVE_DIR)
-        
-    print(" HOÀN THÀNH TÁC VỤ ")
+    

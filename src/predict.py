@@ -30,10 +30,7 @@ def get_scaler_and_data(csv_path):
     return scaler, data, df
 
 def main():
-    print(f"\n=============================================")
-    print(f"   Mã cổ phiếu: {STOCK_SYMBOL}")
-    print(f"=============================================\n")
-
+    print(f"Mã cổ phiếu: {STOCK_SYMBOL}")
     # 1 kiểm tra model
     if not os.path.exists(MODEL_PATH):
         print(f"Chưa có model cho {STOCK_SYMBOL}. Vui lòng chạy train.py trước.")
@@ -59,11 +56,10 @@ def main():
     last_date = df_o.iloc[-1]['Date'] if 'Date' in df_o.columns else "Phiên gần nhất"
 
     print(f"Dữ liệu cập nhật đến ngày: {last_date}")
-    print(f"Giá đóng cửa hiện tại:      {current_price:.2f} USD")
+    print(f"Giá đóng cửa hiện tại:{current_price:.2f} USD")
     print(f"Dự đoán phiên tiếp theo: {pred_price:.2f} USD")
     
-    print("\n=============================================")
-    # Lấy giá trị SMA ngày cuối cùng
+   # Lấy giá trị SMA ngày cuối cùng
     last_sma_10 = df_o.iloc[-1]['SMA_10']
     last_sma_60 = df_o.iloc[-1]['SMA_60']
 
@@ -79,8 +75,7 @@ def main():
         print("MUA")
     else:
         # SMA 60 > SMA 10 => BÁN 
-        print("BÁN")
-    print("=============================================\n")
+        print("Bán")
 
     # --- VẼ HÌNH ĐỂ BÁO CÁO (Output Chart) ---
     print("vẽ biểu đồ kết quả...")
