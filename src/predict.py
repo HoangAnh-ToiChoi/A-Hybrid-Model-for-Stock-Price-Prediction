@@ -4,9 +4,10 @@ from tensorflow.keras.models import load_model
 from sklearn.preprocessing import MinMaxScaler
 import os
 import matplotlib.pyplot as plt
+from config import TIME_STEP
 
-STOCK_SYMBOL = "AAPL"
-MODEL_PATH = f"experiments/{STOCK_SYMBOL}.keras"
+STOCK_SYMBOL = "TSLA"
+MODEL_PATH = f"models/{STOCK_SYMBOL}_model.h5"
 CSV_PATH = f"data/raw/{STOCK_SYMBOL}.csv"
 
 # 1. Hàm xử lý dữ liệu
@@ -41,7 +42,7 @@ def main():
 
     # 2. Lấy dữ liệu gần nhất
     # lấy 60 ngày để dự đoán ngày thứ thứ 61
-    last_60days = data [-60:]
+    last_60days = data [-TIME_STEP:]
     input_scaled = scaler.transform(last_60days)
 
     x_test = np.array([input_scaled])
@@ -100,10 +101,9 @@ def main():
     plt.plot([last_idx-1, last_idx], [plot_df['Close'].iloc[-1], pred_price], 
              color='red', linestyle=':', alpha=0.6)
 
-    plt.title(f'Dự báo {STOCK_SYMBOL} - Theo hướng dẫn Nhóm 11.1')
+    plt.title(f'Dự báo {STOCK_SYMBOL}')
     plt.legend()
-    plt.grid(True, alpha=0.3)
-    
+    plt.grid(True, alpha=0.3)    
     # Lưu ảnh
     save_path = f"experiments/{STOCK_SYMBOL}_prediction.png"
     plt.savefig(save_path)

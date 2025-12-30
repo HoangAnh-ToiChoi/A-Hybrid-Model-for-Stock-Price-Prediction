@@ -2,7 +2,6 @@ import numpy as np
 import os
 import pandas as pd
 from model import build_cnn_lstm_model
-# Đảm bảo file config.py đã set TIME_STEP = 100
 from config import TIME_STEP, EPOCH, BATCH_SIZE, LR, DATA_PATH
 from preprocess import load_data 
 import glob 
@@ -38,7 +37,7 @@ def train_model(csv_file):
     # Đường dẫn lưu file model chuẩn (.h5 để Role 3 dễ dùng)
     model_path = os.path.join(save_dir, f"{stock_symbol}_model.h5")
 
-    # Cấu hình Callbacks (Tuyệt vời cho Week 3)
+    # Cấu hình Callbacks
     checkpoint = [
         # Chỉ lưu model tốt nhất vào file .h5
         ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True, verbose=1),
