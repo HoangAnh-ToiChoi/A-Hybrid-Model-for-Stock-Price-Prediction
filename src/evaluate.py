@@ -1,47 +1,94 @@
+import sys
+import os
+import joblib
 import numpy as np
 import pandas as pd
-from tensorflow.keras.models import load_model
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_absolute_percentage_error
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error, r2_score
 
-# Cấu hình
-STOCK_SYMBOL = "TSLA" # Hoặc AAPL
-MODEL_PATH = f"experiments/{STOCK_SYMBOL}.keras"
-CSV_PATH = f"data/raw/{STOCK_SYMBOL}.csv"
+# Thêm đường dẫn để import được module trong folder src
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Load Model & Data
-model = load_model(MODEL_PATH)
-df = pd.read_csv(CSV_PATH)
-df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
-df = df.dropna(subset=['Close'])
-data = df.filter(['Close']).values
+# Import các hàm từ hệ thống mới
+from src.config import TIME_STEP, DATA_PATH
+from src.data_ingest import get_realtime_data, add_technical_indicators
+from src.preprocess import prepare_multivariate_data
 
-scaler = MinMaxScaler(feature_range=(0, 1))
-scaled_data = scaler.fit_transform(data)
+# Tắt GPU trên Mac để tránh lỗi 
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-# Lấy dữ liệu test (Ví dụ 20% cuối cùng)
-test_len = int(len(scaled_data) * 0.2)
-test_data = scaled_data[-test_len:]
+def evaluate_model(ticker):
 
-x_test, y_true = [], []
-for i in range(60, len(test_data)):
-    x_test.append(test_data[i-60:i, 0])
-    y_true.append(test_data[i, 0])
+    #tải data real time
+    try:
+        df_raw = get_realtime_data(ticker, years=5)
+        df_rich = add_technical_indicators(df_raw)
+    except Exception as e:
+        return
 
-x_test = np.array(x_test)
-x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
+    # tiền xử lí data
+    X, y, _, _ = prepare_multivariate_data(df_rich, TIME_STEP)
+    
+    # 3. load model & scaler đã lưu
+    model_path = f"models/{ticker}_final_model.h5"
+    scaler_path = f"models/{ticker}_scaler_y.pkl"
 
-# Dự đoán
-preds = model.predict(x_test, verbose=0)
-# Đảo ngược scale về giá thật
-preds_real = scaler.inverse_transform(preds)
-y_true_real = scaler.inverse_transform(np.array(y_true).reshape(-1, 1))
+    if not os.path.exists(model_path) or not os.path.exists(scaler_path):
+        return
 
-# TÍNH TOÁN ĐỘ CHÍNH XÁC
-mape = mean_absolute_percentage_error(y_true_real, preds_real)
-accuracy = 100 - (mape * 100)
+    model = tf.keras.models.load_model(model_path)
+    scaler_y = joblib.load(scaler_path) # Load scaler giá Close
 
-print(f"===================================")
-print(f"Sai số trung bình (MAPE): {mape*100:.2f}%")
-print(f"ĐỘ CHÍNH XÁC MÔ HÌNH:    {accuracy:.2f}%")
-print(f"===================================")
+    # dự báo
+    test_split_idx = int(len(X) * 0.65)
+    
+    X_test = X[test_split_idx:]
+    y_test = y[test_split_idx:]
+    
+    # Model dự báo ra giá trị trong khoảng [0, 1]
+    y_pred_scaled = model.predict(X_test)
+
+    # đảo ngược chuẩn hoá về usd
+    # Dùng scaler_y đã load để đổi ngược
+    y_test_actual = scaler_y.inverse_transform(y_test.reshape(-1, 1))
+    y_pred_actual = scaler_y.inverse_transform(y_pred_scaled)
+
+    # tính toán chỉ số
+    rmse = np.sqrt(mean_squared_error(y_test_actual, y_pred_actual))
+    mape = mean_absolute_percentage_error(y_test_actual, y_pred_actual)
+    r2 = r2_score(y_test_actual, y_pred_actual)
+
+    print(f"RMSE (Sai số trung bình): ${rmse:.2f}")
+    print(f"MAPE (Sai số %):          {mape*100:.2f}%")
+    print(f"R2 Score (Độ khớp):       {r2:.4f}")
+
+    # 7. VẼ BIỂU ĐỒ
+    plot_results(ticker, y_test_actual, y_pred_actual, r2)
+
+def plot_results(ticker, y_true, y_pred, r2):
+    plt.figure(figsize=(12, 6))
+    plt.plot(y_true, color='#00ff00', label='Giá Thực tế (Actual)') 
+    plt.plot(y_pred, color='#ff0000', label='Giá Dự báo (Predicted)') 
+    
+    plt.title(f'Dự báo giá cổ phiếu {ticker} (Multivariate CNN-LSTM) - R2: {r2:.2f}')
+    plt.xlabel('Thời gian (Ngày)')
+    plt.ylabel('Giá trị (USD)')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    # Lưu ảnh
+    if not os.path.exists('reports'):
+        os.makedirs('reports')
+    save_path = f"reports/{ticker}_evaluation.png"
+    plt.savefig(save_path)
+    print(f"\n Đã lưu biểu đồ vào: {save_path}")
+    print(f"Đã lưu file tại thư mục 'reports/'.")
+    plt.close()
+
+if __name__ == "__main__":
+    TICKERS = ['AAPL', 'TSLA']
+    
+    for ticker in TICKERS:
+        evaluate_model(ticker)
+        

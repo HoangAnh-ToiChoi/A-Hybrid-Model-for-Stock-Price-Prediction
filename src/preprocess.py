@@ -1,43 +1,47 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from src.config import FEATURE_COLUMNS # Import danh sách cột
 
-def load_data(csv_path, time_step):
-    # 1 doc du lieu tu file csv o folder data/raw
-    df = pd.read_csv(csv_path)
+def create_dataset_vectorized(dataset, time_step=60):
+    
+    # Chuyển dữ liệu thành dạng mảng numpy nếu chưa phải
+    data = np.array(dataset)
+    
+    # Tính số lượng mẫu có thể tạo ra
+    n_samples = len(data) - time_step
+    
+    if n_samples <= 0:
+        return np.array([]), np.array([])
 
-    # Ép giá trị cột "Close" về dạng số
-    df['Close'] = pd.to_numeric(df['Close'], errors = 'coerce')
-    # Xóa các cột có giá trị rỗng
-    df = df.dropna()
+    # Ma thuật của Numpy: Tạo các chỉ số (indexes) để cắt dữ liệu cùng lúc
+    # Tạo mảng chỉ số [0, 1, 2, ..., time_step-1]
+    # Sau đó cộng với [0, 1, 2, ..., n_samples-1] để tạo cửa sổ trượt
+    idx = np.arange(time_step)[None, :] + np.arange(n_samples)[:, None]
+    
+    # Cắt X (Input) siêu tốc
+    X = data[idx]
+    
+    # Cắt y (Output) - Lấy giá Close (cột 0) tại thời điểm ngay sau cửa sổ
+    y = data[time_step:, 0]
+    
+    return X, y
 
-    #2 lay cot 'Close' de tien xu ly
-    data = df.filter(['Close']).values
+def prepare_multivariate_data(df, time_step):
+  
+    # 1. Lọc cột
+    df_filtered = df[FEATURE_COLUMNS]
+    data_values = df_filtered.values
 
-    # 3 chuan hoa du lieu ve khoang (0, 1)
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaler_data = scaler.fit_transform(data.reshape(-1, 1))
+    # 2. Scaling
+    scaler_X = MinMaxScaler(feature_range=(0, 1))
+    scaled_data = scaler_X.fit_transform(data_values)
 
-    # 4 chia du lieu thanh 65 va 35 de train 
-    strain_size = int(np.ceil(len(scaler_data) * 0.65))
-    train_data = scaler_data[0:strain_size, :]
+    scaler_y = MinMaxScaler(feature_range=(0, 1))
+    scaler_y.fit(df[['Close']])
 
-    # 5 tao dataset de train
-    x_train, y_train = create_dataset(train_data, time_step)
+    # 3. Tạo dataset bằng hàm Vectorized mới
+    X, y = create_dataset_vectorized(scaled_data, time_step)
 
-    #6 tao dataset de test
-    test_data = scaler_data[strain_size - time_step:, :]
-    x_test, y_test = create_dataset(test_data, time_step)
-
-    x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], 1)
-    x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
-
-    return x_train, y_train, x_test, y_test, scaler 
-
-def create_dataset(data, time_step):
-    data_x, data_y = [], []
-    for i in range(len(data) - time_step - 1):
-        a = data[i:(i + time_step), 0]
-        data_x.append(a)
-        data_y.append(data[i + time_step, 0])
-    return np.array(data_x), np.array(data_y)
+    print(f" [Fast Process] Đã xử lý {len(X)} mẫu dữ liệu trong tíc tắc.")
+    return X, y, scaler_y, scaler_X

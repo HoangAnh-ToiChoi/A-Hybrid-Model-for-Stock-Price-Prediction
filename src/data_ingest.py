@@ -1,51 +1,43 @@
+# src/data_ingest.py
 import yfinance as yf
 import pandas as pd
-import os
+import numpy as np
+from datetime import datetime, timedelta
 
-def download_stock_data(ticker, start_date, end_date, save_folder):
-    """
-    Hàm tải dữ liệu và lưu vào thư mục chỉ định
-    """
-    print(f"\n Đang xử lý mã: {ticker}...")
+def get_realtime_data(symbol, years=5):
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=365 * years)
     
-    #Call data từ Yahoo Finance
-    try: 
-        df = yf.download(ticker, start=start_date, end=end_date)
-    except Exception as e:
-        print(f" Lỗi kết nối khi tải {ticker}: {e}")
-        return None
+    df = yf.download(symbol, start=start_date, end=end_date)
     
-    # Kiểm tra dữ liệu
-    if len(df) == 0:
-        print(f" Không tìm thấy dữ liệu cho {ticker}! Vui lòng kiểm tra lại mã.")
-        return None
-    
-    # Chỉ giữ lại cột Close
-
-    df = df[['Close']]
-    
-    # 4. Tạo đường dẫn lưu file (
-    os.makedirs(save_folder, exist_ok=True)
-    file_path = os.path.join(save_folder, f"{ticker}.csv")
-    
-    # 5. Lưu ra file CSV
-    df.to_csv(file_path)
-    print(f" Đã lưu thành công: {file_path}")
-    print(f" Tổng số dòng: {len(df)}")
+    # xử lý multiIndex 
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+        
     return df
 
-#  (MAIN) 
-if __name__ == "__main__":
-    # CẤU HÌNH: Danh sách mã cổ phiếu muốn tải
-    MY_TICKERS = ['AAPL', 'TSLA'] 
-    START_DATE = '2015-01-01'
-    END_DATE = '2024-01-01'
-    SAVE_DIR = 'data/raw' # Thư mục lưu trữ
+def add_technical_indicators(df):
+    data = df.copy()
     
-    print(" BẮT ĐẦU TẢI DỮ LIỆU...")
+    # thay thế sma20,60 bằng sma10s,50
+    data['SMA_10'] = data['Close'].rolling(window=10).mean()
+    data['SMA_50'] = data['Close'].rolling(window=50).mean()
     
-    # Vòng lặp: Chạy qua từng mã trong danh sách
-    for ticker in MY_TICKERS:
-        download_stock_data(ticker, START_DATE, END_DATE, SAVE_DIR)
-        
-    print(" HOÀN THÀNH TÁC VỤ ")
+    #rsi
+    delta = data['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    data['RSI'] = 100 - (100 / (1 + rs))
+    
+    #macd
+    ema12 = data['Close'].ewm(span=12, adjust=False).mean()
+    ema26 = data['Close'].ewm(span=26, adjust=False).mean()
+    data['MACD'] = ema12 - ema26
+    
+    #volume
+    data['Volume'] = data['Volume'].fillna(0)
+    
+    data.dropna(inplace=True)
+    
+    return data

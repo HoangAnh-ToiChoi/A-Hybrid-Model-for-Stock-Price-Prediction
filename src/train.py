@@ -1,76 +1,74 @@
-import numpy as np
+import sys
 import os
+import joblib # Dùng để lưu Scaler
+import numpy as np
 import pandas as pd
-from model import build_cnn_lstm_model
-from config import TIME_STEP, EPOCH, BATCH_SIZE, LR, DATA_PATH
-from preprocess import load_data # hàm tải dữ liệu từ file csv
-import glob 
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-def train_model(csv_file):
-    # Lấy dữ liệu từ file csv
-    stock_symbol = os.path.basename(csv_file).replace('.csv', '')
-    
-    print(f"\n{'='*40}")
-    print(f"Đang tải dữ liệu từ mã cổ phiếu: {stock_symbol}\n")
-    print(f"\n{'='*40}")
+# Import các module đã viết
+from src.config import TIME_STEP, EPOCH, BATCH_SIZE, LR, FEATURE_COLUMNS
+from src.data_ingest import get_realtime_data, add_technical_indicators
+from src.preprocess import prepare_multivariate_data
+from src.model import build_cnn_lstm_model
 
+def train_pipeline(stock_symbol='AAPL'):
+
+    # kéo data real time về
+    # Lấy 5 năm dữ liệu 
     try:
-        x_train, y_train, x_test, y_test, scaler = load_data(csv_file, TIME_STEP)
-        print(f"Dữ liệu đã {stock_symbol} được tải lên và đã sẵn sàng 💪 \n")
-        print(f"Shape train: {x_train.shape}\n")
-        print(f"Shape test: {x_test.shape}\n")
+        df_raw = get_realtime_data(stock_symbol, years=5)
+        print(f"   -> Đã tải {len(df_raw)} dòng dữ liệu.")
     except Exception as e:
-        print(f"Lỗi khi tải dữ liệu. Lỗi đọc file {csv_file}", e)
         return
-    print("\n BẮT ĐẦU KHỞI TẠO MODEL HYBRID CNN-LSTM \n")
-    model = build_cnn_lstm_model(time_step = TIME_STEP, features = 1, learning_rate = LR)
-    model.summary()
 
-    print (f"\n QUÁ TRÌNH TRAIN DỮ LIỆU {stock_symbol} BẮT DẦU: ")
+    # feature engineering (thêm RSI, MACD, Volume)
+    df_rich = add_technical_indicators(df_raw)
+    print(f"   -> Các đặc trưng hiện có: {list(df_rich.columns)}")
 
-    checkpoint = [
-            # Lưu model tốt nhất
-    ModelCheckpoint(f"experiments/{stock_symbol}.keras", monitor='val_loss', save_best_only=True, verbose=1),
+    # BƯỚC 3: scaling,window
+    X, y, scaler_y, scaler_X = prepare_multivariate_data(df_rich, TIME_STEP)
     
-    # KỸ THUẬT MỚI: Giảm Learning Rate khi loss đi ngang
-    # Nếu val_loss không giảm sau 3 epoch -> chia đôi tốc độ học
-    ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6, verbose=1),
+    # tự động lấy số lượng features (6)
+    n_features = X.shape[2]
+    print(f"   -> Input Shape: {X.shape}") 
+    print(f"   -> Time Step: {TIME_STEP}, Features: {n_features}")
+
+    # chia tập Train/Test
+    # shuffle=False dữ liệu chuỗi thời gian (không được xáo trộn ngày tháng)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.35, shuffle=False)
+    print(f"   -> Train set: {X_train.shape} (65%)")
+    print(f"   -> Test set:  {X_test.shape} (35%)")
+
+    # build,train
+    model = build_cnn_lstm_model(TIME_STEP, n_features, LR)
     
-    # Dừng sớm nếu không khá hơn sau 10 epoch
-    EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=1)
-    ]
+    # Callback: Lưu model tốt nhất và dừng sớm nếu không học thêm được
+    checkpoint = ModelCheckpoint(f"models/{stock_symbol}_best_model.h5", save_best_only=True, monitor='val_loss', mode='min')
+    early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
     history = model.fit(
-        x_train, y_train, # lấy dữ liệu và kết quả ra học 
-        validation_split = 0.2, # dùng dữ liệu test và kết quả test để kiểm tra sau khi đã học hết 1000 câu hỏi
-        epochs = EPOCH, # lặp lại 100 lần
-        batch_size = BATCH_SIZE, # 1000 câu hỏi thì mỗi lần học chỉ 32 câu đến khi hết 1000 câu thì quay lại dòng validation_data
-        callbacks = checkpoint
+        X_train, y_train,
+        validation_data=(X_test, y_test),
+        epochs=EPOCH,
+        batch_size=BATCH_SIZE,
+        callbacks=[checkpoint, early_stop],
+        verbose=1
     )
-
-    save_dir = 'experiments'
-    if not os.path.isdir(save_dir):
-        os.makedirs(save_dir)
-    save_path = os.path.join(save_dir, f"{stock_symbol}.keras")
-    model.save(save_path)
-    print(f"đã lưu model tại: {save_path}")
-
-
-def main():
-    csv_files = glob.glob(os.path.join(DATA_PATH, '*.csv'))
-
-    if not csv_files:
-        print(f"Không tìm thấy file CSV trong thư mục {DATA_PATH}")
-        return
     
-    print(f"🔍 Tìm thấy {len(csv_files)} file dữ liệu: {[os.path.basename(f) for f in csv_files]}")
-
-    for csv_file in csv_files:
-        train_model(csv_file)
-    print("\n🎉 Đã hoàn thành training cho tất cả các mã cổ phiếu!")
-    print("hehehe 🚀")
-
-if __name__ == '__main__':
-    main()
+    # lưu Model cuối cùng
+    model.save(f"models/{stock_symbol}_final_model.h5")
+    
+    #lưu Scaler của y (giá Close) để sau này dự báo ngược ra tiền thật
+    if not os.path.exists('models'):
+        os.makedirs('models')
+    joblib.dump(scaler_y, f"models/{stock_symbol}_scaler_y.pkl")
+    
+if __name__ == "__main__":
+    TICKERS = ['AAPL', 'TSLA']
+    
+    for ticker in TICKERS:
+        train_pipeline(ticker)
+        

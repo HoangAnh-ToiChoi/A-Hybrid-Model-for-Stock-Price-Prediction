@@ -1,24 +1,33 @@
 import tensorflow as tf
-from tensorflow.keras.models import Sequential # mo hinh tuyen tinh, cac lop xep chong len nhau
-from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten, Conv1D, MaxPooling1D, LSTM, Input # cac lop bulding block
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Conv1D, MaxPooling1D, Input, Flatten
+from tensorflow.keras.optimizers import Adam
 
+def build_cnn_lstm_model(time_step, n_features, learning_rate=0.001):
+    #Lớp 1;input layer
+    model = Sequential()
+    model.add(Input(shape=(time_step, n_features)))
 
-def build_cnn_lstm_model(time_step = 60, features = 1, learning_rate = 0.001):
-   model = Sequential()
+    # cnn
+    # tăng filters lên 64 xử lý 6 cột dữ liệu
+    model.add(Conv1D(filters=64, kernel_size=2, activation='relu'))
+    model.add(MaxPooling1D(pool_size=2))
 
-   model.add(Input(shape=(time_step, features)))
-   model.add(Conv1D(filters = 64, kernel_size = 2, activation = 'relu'))
-   model.add(MaxPooling1D(pool_size = 2))
+    # lstm
+    # return_sequences=True để truyền chuỗi sang lớp LSTM tiếp theo
+    model.add(LSTM(128, return_sequences=True)) 
+    model.add(Dropout(0.3)) # tăng dropout để chống overlifting
 
-   model.add(LSTM(64, return_sequences = True))
-   model.add(Dropout(0.2))
+    # return_sequences=False để tổng hợp kết quả cuối cùng
+    model.add(LSTM(64, return_sequences=False))
+    model.add(Dropout(0.3))
 
-   model.add(LSTM(32, return_sequences = False))
-   model.add(Dropout(0.2))
+    # outputlayer
+    model.add(Dense(32, activation='relu')) # Lớp trung gian
+    model.add(Dense(1)) # Output: 1 giá trị (Giá Close dự báo)
 
-   model.add(Dense(1))
+    #compile
+    optimizer = Adam(learning_rate=learning_rate)
+    model.compile(optimizer=optimizer, loss='mean_squared_error')
 
-   optimizer = tf.keras.optimizers.Adam(learning_rate = learning_rate)
-   model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer = optimizer)
-
-   return model
+    return model
