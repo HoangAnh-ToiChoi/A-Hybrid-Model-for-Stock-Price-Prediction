@@ -59,7 +59,7 @@ def convert(h5_path: str, out_path: str, quantize: str = "none"):
         with open(out_path, "wb") as f:
             f.write(tflite_model)
             
-        print(f"✅ SUCCESS: Saved TFLite model to: {out_path}")
+        print(f"SUCCESS: Saved TFLite model to: {out_path}")
         
     except Exception as e:
         print(f"\n❌ CONVERSION FAILED for {h5_path}")

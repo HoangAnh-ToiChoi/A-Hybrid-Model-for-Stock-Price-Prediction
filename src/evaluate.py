@@ -30,7 +30,7 @@ def evaluate_model(ticker):
     # tiền xử lí data
     X, y, _, _ = prepare_multivariate_data(df_rich, TIME_STEP)
     
-    # 3. load model & scaler đã lưu
+    #  load model & scaler đã lưu
     model_path = f"models/{ticker}_final_model.h5"
     scaler_path = f"models/{ticker}_scaler_y.pkl"
 
@@ -63,7 +63,7 @@ def evaluate_model(ticker):
     print(f"MAPE (Sai số %):          {mape*100:.2f}%")
     print(f"R2 Score (Độ khớp):       {r2:.4f}")
 
-    # 7. VẼ BIỂU ĐỒ
+    # front biểu đồ
     plot_results(ticker, y_test_actual, y_pred_actual, r2)
 
 def plot_results(ticker, y_true, y_pred, r2):
